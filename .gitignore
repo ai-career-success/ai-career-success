@@ -1,7 +1,36 @@
+# Dependencies
 node_modules/
+
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Build output
 dist/
+build/
+*.tsbuildinfo
+
+# Uploads and local data
 uploads/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test / coverage
+coverage/
+
+# OS
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
 .vscode/
+.idea/
+*.swp
+*~
+
+# Docker
+docker-data/
