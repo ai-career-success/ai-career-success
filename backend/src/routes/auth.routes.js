@@ -25,18 +25,22 @@ function signTokens(user) {
 router.post("/register", async (req, res) => {
   if (!requireJwtSecrets(res)) return;
 
-  const { email, password } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  const { first_name, last_name, email, password } = req.body || {};
+  const firstName = typeof first_name === "string" ? first_name.trim() : "";
+  const lastName = typeof last_name === "string" ? last_name.trim() : "";
+  if (!firstName || !lastName || !email || !password) {
+    return res.status(400).json({
+      error: "First name, last name, email, and password are required",
+    });
   }
 
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     const result = await query(
-      `INSERT INTO users (email, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, email, role`,
-      [String(email).toLowerCase().trim(), passwordHash]
+      `INSERT INTO users (first_name, last_name, email, password_hash)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, first_name, last_name, email, role`,
+      [firstName, lastName, String(email).toLowerCase().trim(), passwordHash]
     );
     const user = result.rows[0];
     return res.status(201).json({ user, ...signTokens(user) });
@@ -58,7 +62,7 @@ router.post("/login", async (req, res) => {
 
   try {
     const result = await query(
-      `SELECT id, email, role, password_hash, is_active
+      `SELECT id, first_name, last_name, email, role, password_hash, is_active
        FROM users WHERE email = $1`,
       [String(email).toLowerCase().trim()]
     );
@@ -72,6 +76,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    await query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
     delete user.password_hash;
     return res.json({ user, ...signTokens(user) });
   } catch {
