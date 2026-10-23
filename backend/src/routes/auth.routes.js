@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { query } = require("../config/db");
+const authController = require("../controllers/auth.controller");
 
 const router = express.Router();
 
@@ -22,36 +23,10 @@ function signTokens(user) {
   return { accessToken, refreshToken };
 }
 
-router.post("/register", async (req, res) => {
-  if (!requireJwtSecrets(res)) return;
+// User registration handled via layered controller -> service -> repository
+router.post("/register", (req, res) => authController.register(req, res));
 
-  const { first_name, last_name, email, password } = req.body || {};
-  const firstName = typeof first_name === "string" ? first_name.trim() : "";
-  const lastName = typeof last_name === "string" ? last_name.trim() : "";
-  if (!firstName || !lastName || !email || !password) {
-    return res.status(400).json({
-      error: "First name, last name, email, and password are required",
-    });
-  }
-
-  try {
-    const passwordHash = await bcrypt.hash(password, 12);
-    const result = await query(
-      `INSERT INTO users (first_name, last_name, email, password_hash)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, first_name, last_name, email, role`,
-      [firstName, lastName, String(email).toLowerCase().trim(), passwordHash]
-    );
-    const user = result.rows[0];
-    return res.status(201).json({ user, ...signTokens(user) });
-  } catch (err) {
-    if (err.code === "23505") {
-      return res.status(409).json({ error: "Email already registered" });
-    }
-    return res.status(500).json({ error: "Registration failed" });
-  }
-});
-
+// User login
 router.post("/login", async (req, res) => {
   if (!requireJwtSecrets(res)) return;
 

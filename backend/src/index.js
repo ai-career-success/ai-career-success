@@ -21,6 +21,7 @@ app.use(express.json({ limit: "1mb" }));
 
 app.use("/health", healthRoutes);
 app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/resumes", resumeRoutes);
 app.use("/job-descriptions", jobDescriptionRoutes);
 app.use("/matches", matchRoutes);
