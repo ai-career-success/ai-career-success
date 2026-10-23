@@ -129,8 +129,8 @@ class AuthService {
         },
       };
     } catch (err) {
-      // Handle PostgreSQL unique constraint violation (code 23505) for race conditions
-      if (err.code === "23505") {
+      // Handle unique constraint violations: Prisma P2002 and PostgreSQL 23505
+      if (err.code === "P2002" || err.code === "23505") {
         throw new ConflictError("Email already registered");
       }
       throw err;

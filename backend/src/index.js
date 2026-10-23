@@ -5,6 +5,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 
+const { disconnect } = require("./config/db");
 const healthRoutes = require("./routes/health.routes");
 const authRoutes = require("./routes/auth.routes");
 const resumeRoutes = require("./routes/resume.routes");
@@ -30,6 +31,19 @@ app.use((req, res) => {
   res.status(404).json({ error: "Not found", path: req.path });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`);
 });
+
+async function shutdown() {
+  try {
+    await disconnect();
+  } catch (err) {
+    console.error("Error disconnecting database:", err);
+  } finally {
+    server.close(() => process.exit(0));
+  }
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

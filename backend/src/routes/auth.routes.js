@@ -1,8 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { query } = require("../config/db");
 const authController = require("../controllers/auth.controller");
+const userRepository = require("../repositories/user.repository");
 
 const router = express.Router();
 
@@ -36,12 +36,7 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-    const result = await query(
-      `SELECT id, first_name, last_name, email, role, password_hash, is_active
-       FROM users WHERE email = $1`,
-      [String(email).toLowerCase().trim()]
-    );
-    const user = result.rows[0];
+    const user = await userRepository.findByEmailWithPassword(email);
     if (!user || !user.is_active) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -51,7 +46,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    await query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
+    await userRepository.updateLastLogin(user.id);
     delete user.password_hash;
     return res.json({ user, ...signTokens(user) });
   } catch {
