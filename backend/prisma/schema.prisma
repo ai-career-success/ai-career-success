@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AtsReport {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  analysis_id      String         @unique @db.Uuid
+  overall_score    Decimal?       @db.Decimal(5, 2)
+  missing_keywords String[]
+  details          Json?
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  match_analysis   MatchAnalysis  @relation(fields: [analysis_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("ats_reports")
+}
+
+model JobDescription {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String           @db.Uuid
+  job_title      String?
+  company_name   String?
+  raw_text       String
+  parsed_data    Json?
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  user           User             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  match_analyses MatchAnalysis[]
+
+  @@unique([id, user_id], map: "uq_job_descriptions_id_user")
+  @@index([user_id], map: "idx_job_descriptions_user_id")
+  @@map("job_descriptions")
+}
+
+model MatchAnalysis {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String           @db.Uuid
+  resume_id          String           @db.Uuid
+  job_description_id String           @db.Uuid
+  overall_score      Decimal?         @db.Decimal(5, 2)
+  result             Json?
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  ats_report         AtsReport?
+  job_description    JobDescription   @relation(fields: [job_description_id, user_id], references: [id, user_id], onDelete: Cascade, onUpdate: NoAction)
+  resume             Resume           @relation(fields: [resume_id, user_id], references: [id, user_id], onDelete: Cascade, onUpdate: NoAction)
+  user               User             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([job_description_id], map: "idx_match_job_id")
+  @@index([resume_id], map: "idx_match_resume_id")
+  @@index([user_id], map: "idx_match_user_id")
+  @@map("match_analyses")
+}
+
+model Resume {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String           @db.Uuid
+  title             String
+  status            String           @default("uploaded")
+  version           Int              @default(1)
+  original_filename String?
+  storage_path      String?
+  parsed_data       Json?
+  created_at        DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime         @default(now()) @db.Timestamptz(6)
+  match_analyses    MatchAnalysis[]
+  user              User             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, title])
+  @@unique([id, user_id], map: "uq_resumes_id_user")
+  @@index([user_id], map: "idx_resumes_user_id")
+  @@map("resumes")
+}
+
+model User {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  first_name       String
+  last_name        String
+  email            String             @unique
+  password_hash    String
+  role             String             @default("user")
+  is_active        Boolean            @default(true)
+  is_verified      Boolean            @default(false)
+  last_login       DateTime?          @db.Timestamptz(6)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  job_descriptions JobDescription[]
+  match_analyses   MatchAnalysis[]
+  resumes          Resume[]
+
+  @@map("users")
+}
