@@ -1,6 +1,33 @@
-const { authService, ValidationError, ConflictError } = require("../services/auth.service");
+const {
+  authService,
+  ValidationError,
+  ConflictError,
+  AuthenticationError,
+} = require("../services/auth.service");
 
 class AuthController {
+  /**
+   * Handle user login.
+   * POST /api/auth/login and POST /auth/login
+   */
+  async login(req, res) {
+    try {
+      const result = await authService.login(req.body);
+      return res.json(result);
+    } catch (err) {
+      if (err instanceof AuthenticationError || err.name === "AuthenticationError") {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      if (err instanceof ValidationError || err.name === "ValidationError") {
+        return res.status(err.statusCode || 400).json({ error: err.message });
+      }
+
+      console.error("Login error:", err.message);
+      return res.status(500).json({ error: "Login failed" });
+    }
+  }
+
   /**
    * Handle user registration.
    * POST /api/auth/register and POST /auth/register
