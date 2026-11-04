@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const userRepository = require("../repositories/user.repository");
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,6 +18,14 @@ class ConflictError extends Error {
     super(message);
     this.name = "ConflictError";
     this.statusCode = 409;
+  }
+}
+
+class AuthenticationError extends Error {
+  constructor() {
+    super("Invalid credentials");
+    this.name = "AuthenticationError";
+    this.statusCode = 401;
   }
 }
 
@@ -93,6 +102,36 @@ class AuthService {
   }
 
   /**
+   * Validate login payload.
+   * @param {object} data
+   */
+  validateLoginData(data) {
+    if (!data || typeof data !== "object") {
+      throw new ValidationError("Login data is required");
+    }
+
+    const email = (data.email || "").toString().trim();
+    const password = typeof data.password === "string" ? data.password : "";
+
+    if (!email) {
+      throw new ValidationError("Email is required");
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      throw new ValidationError("Invalid email format");
+    }
+
+    if (!password) {
+      throw new ValidationError("Password is required");
+    }
+
+    return {
+      email: email.toLowerCase(),
+      password,
+    };
+  }
+
+  /**
    * Register a new user.
    * @param {object} registrationData
    * @returns {Promise<{userId: string, user: object}>}
@@ -136,6 +175,47 @@ class AuthService {
       throw err;
     }
   }
+
+  /**
+   * Authenticate a user and issue access and refresh tokens.
+   * @param {object} credentials
+   * @returns {Promise<{user: object, accessToken: string, refreshToken: string}>}
+   */
+  async login(credentials) {
+    if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+      throw new Error("JWT secrets are not configured");
+    }
+
+    const { email, password } = this.validateLoginData(credentials);
+
+    const user = await userRepository.findByEmailWithPassword(email);
+    if (!user || !user.is_active) {
+      throw new AuthenticationError();
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatches) {
+      throw new AuthenticationError();
+    }
+
+    await userRepository.updateLastLogin(user.id);
+
+    const safeUser = { ...user };
+    delete safeUser.password_hash;
+    const tokenPayload = { sub: user.id, email: user.email, role: user.role };
+    const accessToken = jwt.sign(
+      { ...tokenPayload, tokenType: "access" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+    const refreshToken = jwt.sign(
+      { ...tokenPayload, tokenType: "refresh" },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    return { user: safeUser, accessToken, refreshToken };
+  }
 }
 
 module.exports = {
@@ -143,4 +223,5 @@ module.exports = {
   authService: new AuthService(),
   ValidationError,
   ConflictError,
+  AuthenticationError,
 };

@@ -2,7 +2,8 @@ const jwt = require("jsonwebtoken");
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const match = header.match(/^Bearer\s+(\S+)$/i);
+  const token = match ? match[1] : null;
 
   if (!token) {
     return res.status(401).json({ error: "Authentication required" });
@@ -14,7 +15,11 @@ function requireAuth(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(token, secret);
+    const payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+    if (!payload || typeof payload !== "object" || payload.tokenType !== "access") {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+    req.user = payload;
     return next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
